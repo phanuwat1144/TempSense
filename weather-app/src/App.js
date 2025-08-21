@@ -1,5 +1,20 @@
 import React, { useEffect, useMemo, useState } from "react";
 
+// 🔹 Component กรอบข้อความ ใช้ซ้ำได้
+function MessageBox({ type = "info", children }) {
+  const styles = {
+    info: "bg-blue-50 border-blue-200 text-blue-700",
+    success: "bg-green-50 border-green-200 text-green-700",
+    warning: "bg-yellow-50 border-yellow-200 text-yellow-700",
+    error: "bg-red-50 border-red-200 text-red-700",
+  };
+  return (
+    <div className={`border rounded-xl p-4 shadow-sm mt-3 ${styles[type]}`}>
+      {children}
+    </div>
+  );
+}
+
 export default function App() {
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState([]);
@@ -8,7 +23,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // ค้นหาเมือง
+  // 🔹 ค้นหาเมือง
   useEffect(() => {
     const controller = new AbortController();
     const run = async () => {
@@ -35,7 +50,7 @@ export default function App() {
     };
   }, [query]);
 
-  // ดึงพยากรณ์อากาศ
+  // 🔹 ดึงพยากรณ์อากาศ
   useEffect(() => {
     const controller = new AbortController();
     const fetchForecast = async () => {
@@ -177,7 +192,9 @@ export default function App() {
               </button>
             </div>
           </div>
-          {error && <p className="text-red-600 mt-3">{error}</p>}
+
+          {/* Error Box */}
+          {error && <MessageBox type="error">⚠️ {error}</MessageBox>}
         </div>
 
         {/* Current Weather + Tip */}
@@ -198,7 +215,9 @@ export default function App() {
                     ความรู้สึก {Math.round(weather.current_weather?.temperature ?? 0)}° • ลม {Math.round(weather.current_weather?.windspeed ?? 0)} km/h
                   </div>
                 </div>
-                <div className="bg-indigo-50 rounded-2xl p-4 mt-4 text-indigo-900 font-semibold text-center">{tip}</div>
+
+                {/* Tip Box */}
+                <MessageBox type="info">{tip}</MessageBox>
               </div>
 
               {/* Today highlights */}
@@ -254,7 +273,7 @@ export default function App() {
   );
 }
 
-// กราฟเส้นอุณหภูมิ responsive
+// 🔹 กราฟเส้นอุณหภูมิ responsive
 function MiniLineChart({ labels, values }) {
   const [width, setWidth] = useState(0);
   const height = 200;
