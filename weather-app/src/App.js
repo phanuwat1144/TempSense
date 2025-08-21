@@ -1,14 +1,4 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Sun, CloudRain, Thermometer, Droplets } from "lucide-react";
-
-
-// เว็บไซต์ทำนายสภาพอากาศ (ไม่ต้องใช้ API key) ด้วย Open-Meteo
-// ฟีเจอร์หลัก:
-// - ค้นหาเมือง (ภาษาไทยได้) และเลือกผลลัพธ์
-// - ใช้ตำแหน่งปัจจุบัน (Geolocation)
-// - แสดงสภาพอากาศปัจจุบัน + พยากรณ์ 7 วัน
-// - กราฟแนวโน้มอุณหภูมิรายชั่วโมง (เรียบง่ายด้วย <svg>)
-// - เคล็ดลับ/สรุปการทำนายอย่างย่อ (heuristic)
 
 export default function App() {
   const [query, setQuery] = useState("");
@@ -18,7 +8,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // ค้นหาเมืองด้วย Open-Meteo Geocoding API
+  // ค้นหาเมือง
   useEffect(() => {
     const controller = new AbortController();
     const run = async () => {
@@ -35,9 +25,7 @@ export default function App() {
         const data = await res.json();
         setSuggestions(data.results || []);
       } catch (e) {
-        if (e.name !== "AbortError") {
-          console.error(e);
-        }
+        if (e.name !== "AbortError") console.error(e);
       }
     };
     const t = setTimeout(run, 300);
@@ -47,7 +35,7 @@ export default function App() {
     };
   }, [query]);
 
-  // ดึงพยากรณ์เมื่อเลือกสถานที่
+  // ดึงพยากรณ์อากาศ
   useEffect(() => {
     const controller = new AbortController();
     const fetchForecast = async () => {
@@ -56,25 +44,12 @@ export default function App() {
       setError("");
       setWeather(null);
       try {
-        const { latitude, longitude, timezone } = selectedPlace;
+        const { latitude, longitude } = selectedPlace;
         const params = new URLSearchParams({
           latitude: String(latitude),
           longitude: String(longitude),
-          current: [
-            "temperature_2m",
-            "relative_humidity_2m",
-            "apparent_temperature",
-            "is_day",
-            "precipitation",
-            "wind_speed_10m",
-          ].join(","),
-          hourly: [
-            "temperature_2m",
-            "precipitation_probability",
-            "precipitation",
-            "relative_humidity_2m",
-            "wind_speed_10m",
-          ].join(","),
+          current_weather: "true",
+          hourly: ["temperature_2m", "precipitation_probability"].join(","),
           daily: [
             "temperature_2m_max",
             "temperature_2m_min",
@@ -88,7 +63,7 @@ export default function App() {
         const res = await fetch(url, { signal: controller.signal });
         if (!res.ok) throw new Error("ดึงข้อมูลพยากรณ์ไม่สำเร็จ");
         const data = await res.json();
-        setWeather({ ...data, timezone });
+        setWeather({ ...data });
       } catch (e) {
         if (e.name !== "AbortError") {
           console.error(e);
@@ -102,31 +77,21 @@ export default function App() {
     return () => controller.abort();
   }, [selectedPlace]);
 
-  // แปลงวัน/เวลาให้อ่านง่าย (ภาษาไทย)
   const fmt = useMemo(
-    () =>
-      new Intl.DateTimeFormat("th-TH", {
-        weekday: "short",
-        day: "2-digit",
-        month: "short",
-      }),
+    () => new Intl.DateTimeFormat("th-TH", { weekday: "short", day: "2-digit", month: "short" }),
     []
   );
-  const fmtTime = useMemo(
-    () => new Intl.DateTimeFormat("th-TH", { hour: "2-digit", minute: "2-digit" }),
-    []
-  );
+  const fmtTime = useMemo(() => new Intl.DateTimeFormat("th-TH", { hour: "2-digit", minute: "2-digit" }), []);
 
-  // วิเคราะห์ง่ายๆ เพื่อสร้าง "สรุปคำแนะนำ"
   const tip = useMemo(() => {
     if (!weather?.daily) return "พิมพ์ชื่อเมืองด้านบน หรือใช้ตำแหน่งปัจจุบัน";
-    const max = weather.daily.temperature_2m_max?.[0];
-    const min = weather.daily.temperature_2m_min?.[0];
-    const rain = weather.daily.precipitation_probability_max?.[0];
-    if (rain >= 70) return "มีโอกาสฝนตกสูง พกร่มหรือเสื้อกันฝนด้วยนะ";
-    if (max >= 35) return "อากาศร้อนจัด ดื่มน้ำเยอะๆ และหลบแดด";
-    if (min <= 22) return "อากาศค่อนข้างเย็น เตรียมเสื้อคลุมบางๆ";
-    return "อากาศทั่วไป เหมาะกับการทำกิจกรรมกลางแจ้ง";
+    const max = weather.daily.temperature_2m_max?.[0] ?? 0;
+    const min = weather.daily.temperature_2m_min?.[0] ?? 0;
+    const rain = weather.daily.precipitation_probability_max?.[0] ?? 0;
+    if (rain >= 70) return "☔ มีโอกาสฝนสูง พกร่มด้วยนะ";
+    if (max >= 35) return "🔥 ร้อนจัด ดื่มน้ำและหลบแดด";
+    if (min <= 22) return "❄️ อากาศเย็น เตรียมเสื้อคลุมบางๆ";
+    return "🌤 อากาศทั่วไป เหมาะกับกิจกรรมกลางแจ้ง";
   }, [weather]);
 
   const useMyLocation = () => {
@@ -139,28 +104,14 @@ export default function App() {
       async (pos) => {
         const { latitude, longitude } = pos.coords;
         try {
-          // Reverse geocoding เพื่อเอาชื่อเมืองสวยๆ
           const rev = await fetch(
             `https://geocoding-api.open-meteo.com/v1/reverse?latitude=${latitude}&longitude=${longitude}&language=th&format=json`
-          ).then((r) => r.json());
-          const place = rev?.results?.[0] || {
-            name: "ตำแหน่งของฉัน",
-            country: "",
-            admin1: "",
-            latitude,
-            longitude,
-            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-          };
+          ).then(r => r.json());
+          const place = rev?.results?.[0] || { name: "ตำแหน่งของฉัน", latitude, longitude };
           setSelectedPlace(place);
           setQuery(`${place.name}${place.admin1 ? ", " + place.admin1 : ""}`);
-        } catch (e) {
-          console.error(e);
-          setSelectedPlace({
-            name: "ตำแหน่งของฉัน",
-            latitude,
-            longitude,
-            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-          });
+        } catch {
+          setSelectedPlace({ name: "ตำแหน่งของฉัน", latitude, longitude });
         } finally {
           setLoading(false);
         }
@@ -174,41 +125,37 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-indigo-50 text-slate-800">
-      <div className="max-w-5xl mx-auto p-4 sm:p-6">
-        <header className="flex flex-col gap-2 items-center mb-4">
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">เว็บไซต์ทำนายสภาพอากาศ</h1>
-          <p className="text-slate-600 text-center">ค้นหาเมือง ดูอุณหภูมิ ลม และโอกาสฝน พร้อมสรุปคำแนะนำใช้งานจริง</p>
+    <div className="min-h-screen bg-gradient-to-b from-indigo-50 via-white to-indigo-50 text-gray-800">
+      <div className="max-w-5xl mx-auto p-6">
+        {/* Header */}
+        <header className="text-center mb-6">
+          <h1 className="text-3xl sm:text-4xl font-extrabold text-indigo-700 mb-2">เว็บไซต์ทำนายสภาพอากาศ</h1>
+          <p className="text-gray-600">ค้นหาเมือง ดูอุณหภูมิ ลม ฝน พร้อมสรุปคำแนะนำ</p>
         </header>
 
         {/* Search */}
-        <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-5 border border-slate-200">
+        <div className="relative bg-white rounded-3xl shadow-xl p-5 border border-gray-200 mb-6">
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="ค้นหาเมือง เช่น กรุงเทพฯ, Chiang Mai, Tokyo"
-                className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-500"
+                placeholder="ค้นหาเมือง เช่น กรุงเทพฯ, Chiang Mai"
+                className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-400 shadow-sm"
               />
-              {!!suggestions.length && (
-                <div className="absolute z-10 mt-2 w-full bg-white rounded-xl border border-slate-200 shadow-md max-h-64 overflow-auto">
+              {suggestions.length > 0 && (
+                <div className="absolute z-20 mt-2 w-full bg-white rounded-xl border border-gray-200 shadow-lg max-h-64 overflow-auto">
                   {suggestions.map((s) => (
                     <button
                       key={`${s.id}-${s.latitude}-${s.longitude}`}
-                      className="block w-full text-left px-4 py-2 hover:bg-indigo-50"
+                      className="block w-full text-left px-4 py-3 hover:bg-indigo-50 transition-colors"
                       onClick={() => {
                         setSelectedPlace(s);
                         setSuggestions([]);
                       }}
                     >
-                      <div className="font-medium">
-                        {s.name}
-                        {s.admin1 ? `, ${s.admin1}` : ""}
-                      </div>
-                      <div className="text-sm text-slate-500">
-                        {s.country} • lat {s.latitude.toFixed(2)}, lon {s.longitude.toFixed(2)}
-                      </div>
+                      <div className="font-medium">{s.name}{s.admin1 ? `, ${s.admin1}` : ""}</div>
+                      <div className="text-sm text-gray-500">{s.country} • lat {s.latitude.toFixed(2)}, lon {s.longitude.toFixed(2)}</div>
                     </button>
                   ))}
                 </div>
@@ -217,14 +164,14 @@ export default function App() {
             <div className="flex gap-2">
               <button
                 onClick={useMyLocation}
-                className="rounded-xl px-4 py-3 border border-slate-300 bg-white hover:bg-slate-50 shadow-sm"
+                className="rounded-xl px-4 py-3 border border-gray-300 bg-white hover:bg-indigo-50 shadow-sm transition"
               >
                 ใช้ตำแหน่งของฉัน
               </button>
               <button
                 onClick={() => selectedPlace && setSelectedPlace({ ...selectedPlace })}
                 disabled={!selectedPlace}
-                className="rounded-xl px-4 py-3 bg-indigo-600 text-white shadow hover:bg-indigo-700 disabled:opacity-40"
+                className="rounded-xl px-4 py-3 bg-indigo-600 text-white shadow hover:bg-indigo-700 disabled:opacity-40 transition"
               >
                 โหลดพยากรณ์อีกครั้ง
               </button>
@@ -233,127 +180,96 @@ export default function App() {
           {error && <p className="text-red-600 mt-3">{error}</p>}
         </div>
 
-        {/* Summary / Current */}
-        <section className="grid md:grid-cols-3 gap-4 mt-4">
-          <div className="md:col-span-2 bg-white rounded-2xl shadow-lg p-5 border border-slate-200 min-h-[140px]">
-            {!weather && !loading && (
-              <div className="text-slate-500">เริ่มจากการค้นหาเมืองด้านบน หรือกด "ใช้ตำแหน่งของฉัน"</div>
-            )}
-            {loading && <div className="animate-pulse text-slate-500">กำลังโหลดข้อมูลพยากรณ์…</div>}
-            {weather && (
-              <div className="flex flex-col sm:flex-row items-center sm:items-end justify-between gap-4">
+        {/* Current Weather + Tip */}
+        {loading ? (
+          <div className="text-center py-10 animate-pulse text-gray-500">กำลังโหลดข้อมูลพยากรณ์...</div>
+        ) : weather ? (
+          <>
+            <div className="grid md:grid-cols-3 gap-6 mb-6">
+              {/* Current */}
+              <div className="md:col-span-2 bg-white rounded-3xl shadow-xl p-6 border border-gray-200 flex flex-col justify-between">
                 <div>
-                  <div className="text-lg font-semibold">
-                    {selectedPlace?.name}
-                    {selectedPlace?.admin1 ? `, ${selectedPlace.admin1}` : ""}
-                  </div>
-                  <div className="text-slate-500 text-sm">
+                  <div className="text-xl font-semibold">{selectedPlace?.name}{selectedPlace?.admin1 ? `, ${selectedPlace.admin1}` : ""}</div>
+                  <div className="text-gray-500 text-sm mb-4">
                     lat {Number(selectedPlace.latitude).toFixed(2)}, lon {Number(selectedPlace.longitude).toFixed(2)}
                   </div>
-                  <div className="mt-3 text-5xl font-bold">
-                    {Math.round(weather.current?.temperature_2m)}°C
-                  </div>
-                  <div className="text-slate-600 mt-1">
-                    รู้สึก {Math.round(weather.current?.apparent_temperature)}° • ลม {Math.round(weather.current?.wind_speed_10m)} km/h • ความชื้น {weather.current?.relative_humidity_2m}%
+                  <div className="text-6xl font-bold text-indigo-700">{Math.round(weather.current_weather?.temperature ?? 0)}°C</div>
+                  <div className="text-gray-600 mt-2 text-lg">
+                    ความรู้สึก {Math.round(weather.current_weather?.temperature ?? 0)}° • ลม {Math.round(weather.current_weather?.windspeed ?? 0)} km/h
                   </div>
                 </div>
-                <div className="bg-indigo-50 rounded-xl p-4 w-full sm:w-auto">
-                  <div className="font-semibold mb-1">สรุปคำแนะนำ</div>
-                  <div className="text-indigo-900">{tip}</div>
+                <div className="bg-indigo-50 rounded-2xl p-4 mt-4 text-indigo-900 font-semibold text-center">{tip}</div>
+              </div>
+
+              {/* Today highlights */}
+              <div className="bg-white rounded-3xl shadow-xl p-6 border border-gray-200 flex flex-col justify-between">
+                <h2 className="font-semibold text-gray-700 mb-4">วันนี้</h2>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <div className="text-gray-500 text-sm">สูงสุด</div>
+                    <div className="font-bold text-indigo-700">{Math.round(weather.daily.temperature_2m_max?.[0] ?? 0)}°C</div>
+                  </div>
+                  <div>
+                    <div className="text-gray-500 text-sm">ต่ำสุด</div>
+                    <div className="font-bold text-indigo-700">{Math.round(weather.daily.temperature_2m_min?.[0] ?? 0)}°C</div>
+                  </div>
+                  <div>
+                    <div className="text-gray-500 text-sm">โอกาสฝน</div>
+                    <div className="font-bold text-indigo-700">{weather.daily.precipitation_probability_max?.[0] ?? 0}%</div>
+                  </div>
+                  <div>
+                    <div className="text-gray-500 text-sm">พระอาทิตย์ขึ้น/ตก</div>
+                    <div className="font-bold text-indigo-700">
+                      {fmtTime.format(new Date(weather.daily.sunrise?.[0]))} / {fmtTime.format(new Date(weather.daily.sunset?.[0]))}
+                    </div>
+                  </div>
                 </div>
               </div>
-            )}
-          </div>
-
-          {/* Today highlights */}
-<div className="bg-white/70 backdrop-blur-xl rounded-2xl shadow-lg p-5 border border-slate-200">
-  <div className="font-semibold mb-3 flex items-center gap-2 text-indigo-700">
-    <Sun className="w-5 h-5" /> วันนี้
-  </div>
-  {weather ? (
-    <ul className="grid grid-cols-2 gap-3 text-sm">
-      <li className="bg-gradient-to-br from-orange-100 to-orange-200 rounded-xl p-3 shadow-sm">
-        <div className="flex items-center gap-2 text-orange-700 font-medium">
-          <Thermometer className="w-4 h-4" /> สูงสุด
-        </div>
-        <div className="text-2xl font-bold">
-          {Math.round(weather.daily.temperature_2m_max?.[0])}°C
-        </div>
-      </li>
-      <li className="bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl p-3 shadow-sm">
-        <div className="flex items-center gap-2 text-blue-700 font-medium">
-          <Thermometer className="w-4 h-4" /> ต่ำสุด
-        </div>
-        <div className="text-2xl font-bold">
-          {Math.round(weather.daily.temperature_2m_min?.[0])}°C
-        </div>
-      </li>
-      <li className="bg-gradient-to-br from-indigo-100 to-indigo-200 rounded-xl p-3 shadow-sm">
-        <div className="flex items-center gap-2 text-indigo-700 font-medium">
-          <CloudRain className="w-4 h-4" /> โอกาสฝน
-        </div>
-        <div className="text-2xl font-bold">
-          {weather.daily.precipitation_probability_max?.[0]}%
-        </div>
-      </li>
-      <li className="bg-gradient-to-br from-yellow-100 to-yellow-200 rounded-xl p-3 shadow-sm">
-        <div className="flex items-center gap-2 text-yellow-700 font-medium">
-          <Sun className="w-4 h-4" /> พระอาทิตย์ขึ้น/ตก
-        </div>
-        <div className="font-medium">
-          {fmtTime.format(new Date(weather.daily.sunrise?.[0]))} / {fmtTime.format(new Date(weather.daily.sunset?.[0]))}
-        </div>
-      </li>
-    </ul>
-  ) : (
-    <div className="text-slate-500">—</div>
-  )}
-</div>
-        </section>
-
-        {/* Hourly temperature chart (next 24h) */}
-        {weather && (
-          <section className="bg-white rounded-2xl shadow-lg p-5 border border-slate-200 mt-4">
-            <div className="font-semibold mb-3">อุณหภูมิรายชั่วโมง (24 ชั่วโมงถัดไป)</div>
-            <MiniLineChart
-              labels={weather.hourly.time.slice(0, 24)}
-              values={weather.hourly.temperature_2m.slice(0, 24)}
-            />
-          </section>
-        )}
-
-        {/* 7-day forecast */}
-        {weather && (
-          <section className="mt-4">
-            <div className="font-semibold mb-2">พยากรณ์ 7 วัน</div>
-            <div className="grid md:grid-cols-7 gap-3">
-              {weather.daily.time.map((d, i) => (
-                <div key={d} className="bg-white rounded-2xl shadow-lg p-4 border border-slate-200">
-                  <div className="text-sm text-slate-500">{fmt.format(new Date(d))}</div>
-                  <div className="mt-2 text-3xl font-bold">{Math.round(weather.daily.temperature_2m_max[i])}°</div>
-                  <div className="text-slate-600">ต่ำสุด {Math.round(weather.daily.temperature_2m_min[i])}°</div>
-                  <div className="mt-1 text-sm">ฝน {weather.daily.precipitation_probability_max?.[i] ?? 0}%</div>
-                </div>
-              ))}
             </div>
-          </section>
-        )}
 
-        <footer className="mt-8 text-center text-sm text-slate-500">
-          ข้อมูลโดย Open‑Meteo • สร้างด้วย React + Tailwind • ใช้งานได้ฟรี
-        </footer>
+            {/* Hourly Temperature Chart */}
+            <div className="bg-white rounded-3xl shadow-xl p-6 border border-gray-200 mb-6">
+              <h2 className="text-xl font-semibold mb-4 text-gray-700">อุณหภูมิรายชั่วโมง</h2>
+              <MiniLineChart labels={weather.hourly.time} values={weather.hourly.temperature_2m} />
+            </div>
+
+            {/* 7-day forecast */}
+            <div className="mb-6">
+              <h2 className="text-xl font-semibold mb-4 text-gray-700">พยากรณ์ 7 วัน</h2>
+              <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(auto-fit, minmax(120px, 1fr))` }}>
+                {weather.daily.time.map((d, i) => (
+                  <div key={d} className="bg-white rounded-2xl shadow-md p-4 border border-gray-200 flex flex-col items-center">
+                    <div className="text-sm text-gray-500">{fmt.format(new Date(d))}</div>
+                    <div className="mt-2 text-2xl font-bold text-indigo-700">{Math.round(weather.daily.temperature_2m_max?.[i] ?? 0)}°</div>
+                    <div className="text-gray-600 text-sm">ต่ำ {Math.round(weather.daily.temperature_2m_min?.[i] ?? 0)}°</div>
+                    <div className="mt-1 text-xs text-indigo-600">ฝน {weather.daily.precipitation_probability_max?.[i] ?? 0}%</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        ) : null}
       </div>
     </div>
   );
 }
 
+// กราฟเส้นอุณหภูมิ responsive
 function MiniLineChart({ labels, values }) {
-  const width = 900;
+  const [width, setWidth] = useState(0);
   const height = 200;
-  const padding = 28;
+  const padding = 30;
+  const containerRef = React.useRef(null);
+
+  useEffect(() => {
+    const updateWidth = () => setWidth(containerRef.current?.offsetWidth ?? 300);
+    updateWidth();
+    window.addEventListener("resize", updateWidth);
+    return () => window.removeEventListener("resize", updateWidth);
+  }, []);
 
   const points = useMemo(() => {
-    if (!labels?.length || !values?.length) return [];
+    if (!labels?.length || !values?.length || width === 0) return [];
     const n = Math.min(labels.length, values.length);
     const xs = values.slice(0, n);
     const min = Math.min(...xs);
@@ -361,7 +277,7 @@ function MiniLineChart({ labels, values }) {
     const scaleX = (i) => padding + (i * (width - padding * 2)) / (n - 1);
     const scaleY = (v) => height - padding - ((v - min) / (max - min || 1)) * (height - padding * 2);
     return xs.map((v, i) => [scaleX(i), scaleY(v)]);
-  }, [labels, values]);
+  }, [labels, values, width]);
 
   const pathD = useMemo(() => {
     if (!points.length) return "";
@@ -369,25 +285,18 @@ function MiniLineChart({ labels, values }) {
   }, [points]);
 
   return (
-    <div className="overflow-x-auto">
-      <svg viewBox={`0 0 ${width} ${height}`} className="w-[900px] h-[200px]">
-        {/* กริดแนวนอน */}
-        {[0, 1, 2, 3].map((g) => (
-          <line
-            key={g}
-            x1={padding}
-            x2={width - padding}
-            y1={padding + g * ((height - padding * 2) / 3)}
-            y2={padding + g * ((height - padding * 2) / 3)}
-            stroke="#e2e8f0"
-            strokeDasharray="4 4"
-          />
-        ))}
-        {/* เส้นกราฟ */}
-        <path d={pathD} fill="none" stroke="#4f46e5" strokeWidth="2.5" />
-        {/* จุด */}
+    <div ref={containerRef} className="overflow-x-auto w-full">
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-[200px]">
+        <defs>
+          <linearGradient id="grad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#6366f1" stopOpacity={0.3} />
+            <stop offset="100%" stopColor="#6366f1" stopOpacity={0} />
+          </linearGradient>
+        </defs>
+        <path d={`${pathD} L ${points[points.length - 1]?.[0] ?? 0} ${height - padding} L ${points[0]?.[0] ?? 0} ${height - padding} Z`} fill="url(#grad)" />
+        <path d={pathD} fill="none" stroke="#4f46e5" strokeWidth="3" strokeLinecap="round" />
         {points.map(([x, y], i) => (
-          <circle key={i} cx={x} cy={y} r={2.5} fill="#4f46e5" />
+          <circle key={i} cx={x} cy={y} r={3} fill="#4f46e5" />
         ))}
       </svg>
     </div>
