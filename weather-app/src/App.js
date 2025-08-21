@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { Sun, CloudRain, Thermometer, Droplets } from "lucide-react";
+
 
 // เว็บไซต์ทำนายสภาพอากาศ (ไม่ต้องใช้ API key) ด้วย Open-Meteo
 // ฟีเจอร์หลัก:
@@ -264,39 +266,49 @@ export default function App() {
           </div>
 
           {/* Today highlights */}
-          <div className="bg-white rounded-2xl shadow-lg p-5 border border-slate-200">
-            <div className="font-semibold mb-2">วันนี้</div>
-            {weather ? (
-              <ul className="grid grid-cols-2 gap-3 text-sm">
-                <li className="bg-slate-50 rounded-xl p-3">
-                  สูงสุด
-                  <div className="text-2xl font-bold">
-                    {Math.round(weather.daily.temperature_2m_max?.[0])}°C
-                  </div>
-                </li>
-                <li className="bg-slate-50 rounded-xl p-3">
-                  ต่ำสุด
-                  <div className="text-2xl font-bold">
-                    {Math.round(weather.daily.temperature_2m_min?.[0])}°C
-                  </div>
-                </li>
-                <li className="bg-slate-50 rounded-xl p-3">
-                  โอกาสฝน
-                  <div className="text-2xl font-bold">
-                    {weather.daily.precipitation_probability_max?.[0]}%
-                  </div>
-                </li>
-                <li className="bg-slate-50 rounded-xl p-3">
-                  พระอาทิตย์ขึ้น/ตก
-                  <div className="font-medium">
-                    {fmtTime.format(new Date(weather.daily.sunrise?.[0]))} / {fmtTime.format(new Date(weather.daily.sunset?.[0]))}
-                  </div>
-                </li>
-              </ul>
-            ) : (
-              <div className="text-slate-500">—</div>
-            )}
-          </div>
+<div className="bg-white/70 backdrop-blur-xl rounded-2xl shadow-lg p-5 border border-slate-200">
+  <div className="font-semibold mb-3 flex items-center gap-2 text-indigo-700">
+    <Sun className="w-5 h-5" /> วันนี้
+  </div>
+  {weather ? (
+    <ul className="grid grid-cols-2 gap-3 text-sm">
+      <li className="bg-gradient-to-br from-orange-100 to-orange-200 rounded-xl p-3 shadow-sm">
+        <div className="flex items-center gap-2 text-orange-700 font-medium">
+          <Thermometer className="w-4 h-4" /> สูงสุด
+        </div>
+        <div className="text-2xl font-bold">
+          {Math.round(weather.daily.temperature_2m_max?.[0])}°C
+        </div>
+      </li>
+      <li className="bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl p-3 shadow-sm">
+        <div className="flex items-center gap-2 text-blue-700 font-medium">
+          <Thermometer className="w-4 h-4" /> ต่ำสุด
+        </div>
+        <div className="text-2xl font-bold">
+          {Math.round(weather.daily.temperature_2m_min?.[0])}°C
+        </div>
+      </li>
+      <li className="bg-gradient-to-br from-indigo-100 to-indigo-200 rounded-xl p-3 shadow-sm">
+        <div className="flex items-center gap-2 text-indigo-700 font-medium">
+          <CloudRain className="w-4 h-4" /> โอกาสฝน
+        </div>
+        <div className="text-2xl font-bold">
+          {weather.daily.precipitation_probability_max?.[0]}%
+        </div>
+      </li>
+      <li className="bg-gradient-to-br from-yellow-100 to-yellow-200 rounded-xl p-3 shadow-sm">
+        <div className="flex items-center gap-2 text-yellow-700 font-medium">
+          <Sun className="w-4 h-4" /> พระอาทิตย์ขึ้น/ตก
+        </div>
+        <div className="font-medium">
+          {fmtTime.format(new Date(weather.daily.sunrise?.[0]))} / {fmtTime.format(new Date(weather.daily.sunset?.[0]))}
+        </div>
+      </li>
+    </ul>
+  ) : (
+    <div className="text-slate-500">—</div>
+  )}
+</div>
         </section>
 
         {/* Hourly temperature chart (next 24h) */}
