@@ -15,10 +15,4 @@ TempSense คือเว็บแอปพลิเคชันพยากร�
 - Open-Meteo API
 - Render สำหรับการ Deploy
 
-## การติดตั้งและใช้งาน
-
-1. โคลนโปรเจกต์:
-
-   ```bash
-   git clone https://github.com/phanuwat1144/TempSense.git
-   cd TempSense
+![alt text](image.png)
